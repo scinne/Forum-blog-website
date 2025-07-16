@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Admin Login</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 400px; margin: 2rem auto; }
+      form { display: flex; flex-direction: column; }
+      input[type="password"] { margin-top: 1rem; padding: 0.5rem; font-size: 1rem; }
+      button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+      .error { color: darkred; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Admin Login</h1>
+    <form method="post">
+        <label>Password:</label>
+        <input type="password" name="password" required>
+        <button type="submit">Log in</button>
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+    </form>
+    <p><a href="/">Back to homepage</a></p>
+</body>
+</html>

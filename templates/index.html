@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Blog - Home</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+      a { text-decoration: none; color: #2a5db0; }
+      a:hover { text-decoration: underline; }
+      article { margin-bottom: 2rem; }
+      time { font-size: 0.9rem; color: #555; }
+      img { max-width: 300px; max-height: 200px; display: block; margin: 1em 0 0 0; }
+    </style>
+</head>
+<body>
+  {% if session.get('just_logged_in') %}
+  <script>
+    alert("You are logged in");
+  </script>
+  {% set _ = session.pop('just_logged_in') %}
+{% endif %}
+    <h1>My Blog</h1>
+
+{% if posts %}
+  {% for post in posts %}
+    <article>
+        <h2><a href="/post/{{ post[0] }}">{{ post[1] }}</a></h2>
+        <time>{{ post[4] }}</time>
+<div style="white-space: pre-wrap;">{{ post[2][:200] }}{% if post[2]|length > 200 %}...{% endif %}</div>
+{% if post[3] %}
+    <img src="{{ url_for('static', filename='uploads/' ~ post[3]) }}"
+         alt="Uploaded image"
+         style="max-width:300px;max-height:200px;display:block;margin:1em 0 0 0;">
+{% endif %}
+        <a href="/post/{{ post[0] }}">Read more</a>
+    </article>
+  {% endfor %}
+{% else %}
+  <p>No posts yet!</p>
+{% endif %}
+
+<p><a href="/admin">Add New Post</a></p>
+</body>
+</html>
