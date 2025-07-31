@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Add New Post - Admin</title>
+    <style>
+      :root {
+        --fg: #fff;
+        --bg: #161616;
+        --accent: #202020;
+        --border: #353535;
+        --muted: #999;
+        --radius: 18px;
+        --input-width: 480px;
+        --textarea-height: 160px;
+      }
+      html,
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.6rem 1rem;
+      }
+      .admin-container {
+        background: var(--accent);
+        border-radius: var(--radius);
+        border: 1.5px solid var(--border);
+        max-width: 620px;
+        width: 100%;
+        margin: 0 auto;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        padding: 2.4rem 2.5rem 1.8rem 2.5rem;
+      }
+      h1 {
+        text-align: center;
+        font-size: 1.7rem;
+        font-weight: 900;
+        margin-top: 0;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-top: 1.15rem;
+        color: var(--muted);
+        letter-spacing: 0.007em;
+      }
+      input[type="text"],
+      textarea,
+      input[type="file"] {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: var(--input-width);
+        background: #222;
+        border: 1.2px solid var(--border);
+        color: #fff;
+        font-size: 1.1rem;
+        border-radius: 10px;
+        padding: 0.64em 0.74em;
+        margin-top: 0.38em;
+        margin-bottom: 0.18em;
+        font-family: inherit;
+        transition: border 0.15s;
+        display: block;
+      }
+      input[type="text"]:focus,
+      textarea:focus {
+        border-color: #fff;
+        outline: none;
+      }
+      textarea {
+        resize: vertical;
+        min-height: var(--textarea-height);
+        height: var(--textarea-height);
+        font-size: 1.12rem;
+        line-height: 1.46;
+      }
+      input[type="file"] {
+        background: none;
+        color: #aaa;
+        padding: 0.65em 0;
+        border: none;
+      }
+      button {
+        display: inline-block;
+        background: #fff;
+        color: #171717;
+        border-radius: 42px;
+        border: none;
+        font-size: 1.18rem;
+        font-weight: 700;
+        padding: 0.7em 1.7em;
+        margin-top: 1.5em;
+        cursor: pointer;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+        transition: background 0.16s, color 0.16s;
+        letter-spacing: 0.02em;
+      }
+      button:hover {
+        background: #232323;
+        color: #fff;
+      }
+      .back-link {
+        color: #999;
+        display: block;
+        margin: 1.7em 0.2em 0 0;
+        font-size: 1.12rem;
+        text-align: right;
+        text-decoration: none;
+        transition: color 0.14s;
+      }
+      .back-link:hover {
+        color: #fff;
+        text-decoration: underline;
+      }
+      @media (max-width: 700px) {
+        .admin-container {
+          padding: 1.2rem 0.6rem 1.3rem 0.6rem;
+        }
+        h1 {
+          font-size: 1.13rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="admin-container">
+      <h1>Add New Post</h1>
+      <form action="/admin" method="post" enctype="multipart/form-data">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" required />
+
+        <label for="content">Content</label>
+        <textarea id="content" name="content" required></textarea>
+
+        <label for="image">Image / Attachment</label>
+        <input type="file" id="image" name="image" accept="image/*,.pdf,.txt" />
+
+        <button type="submit">Publish Post</button>
+      </form>
+      <a class="back-link" href="/">← Back to homepage</a>
+    </div>
+  </body>
+</html>
