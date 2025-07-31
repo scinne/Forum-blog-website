@@ -5,6 +5,9 @@ import sqlite3
 import datetime
 import os
 import uuid
+import re
+
+
 
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
@@ -28,7 +31,13 @@ def get_posts():
         c.execute("SELECT id, title, content, image_filename, created_at FROM posts ORDER BY created_at DESC")
         rows = c.fetchall()
         return [
-            (post_id, title, content.lstrip(), image_filename, created_at)
+            (
+                post_id,
+                title,
+                re.sub(r'^\s+', '', content),
+                image_filename,
+                created_at
+            )
             for (post_id, title, content, image_filename, created_at) in rows
         ]
 

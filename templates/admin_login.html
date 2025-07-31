@@ -1,26 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin Login</title>
     <style>
-      body { font-family: Arial, sans-serif; max-width: 400px; margin: 2rem auto; }
-      form { display: flex; flex-direction: column; }
-      input[type="password"] { margin-top: 1rem; padding: 0.5rem; font-size: 1rem; }
-      button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
-      .error { color: darkred; margin-top: 1rem; }
+      :root {
+        --fg: #fff;
+        --bg: #161616;
+        --accent: #202020;
+        --border: #353535;
+        --muted: #999;
+        --radius: 18px;
+      }
+      html,
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.6rem 1rem;
+      }
+      .login-container {
+        background: var(--accent);
+        border-radius: var(--radius);
+        border: 1.5px solid var(--border);
+        max-width: 460px;
+        width: 100%;
+        margin: 0 auto;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        padding: 2.7rem 2.5rem 2.2rem 2.5rem;
+      }
+      h1 {
+        text-align: center;
+        font-size: 1.7rem;
+        font-weight: 900;
+        margin-top: 0;
+        margin-bottom: 2.1rem;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        align-items: stretch;
+      }
+      label {
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0.007em;
+        margin-bottom: 0.2em;
+      }
+      input[type="password"] {
+        width: 100%;
+        max-width: 440px;
+        background: #232323;
+        border: 1.2px solid var(--border);
+        color: #fff;
+        font-size: 1.17rem;
+        border-radius: 11px;
+        padding: 0.9em 0.9em;
+        font-family: inherit;
+        transition: border 0.15s;
+        display: block;
+        box-sizing: border-box;
+      }
+      input[type="password"]:focus {
+        border-color: #fff;
+        outline: none;
+      }
+      button {
+        width: 100%;
+        max-width: 440px;
+        font-size: 1.17rem;
+        padding: 0.75em;
+        font-weight: bold;
+        border-radius: 32px;
+        border: none;
+        background: #fff;
+        color: #171717;
+        cursor: pointer;
+        margin-top: 0.2em;
+        transition: background 0.16s, color 0.16s;
+      }
+      button:hover {
+        background: #232323;
+        color: #fff;
+      }
+      .error {
+        color: #ff6060;
+        margin-top: 0.2em;
+        text-align: center;
+        font-size: 1.05rem;
+        letter-spacing: 0.02em;
+      }
+      .back-link {
+        color: #999;
+        display: block;
+        margin: 1.7em 0 0 0;
+        font-size: 1.13rem;
+        text-align: right;
+        text-decoration: none;
+        transition: color 0.14s;
+      }
+      .back-link:hover {
+        color: #fff;
+        text-decoration: underline;
+      }
+      @media (max-width: 540px) {
+        .login-container {
+          padding: 1.1rem 0.6rem 1.3rem 0.6rem;
+        }
+        h1 {
+          font-size: 1.15rem;
+        }
+        input[type="password"],
+        button {
+          max-width: 99vw;
+        }
+      }
     </style>
-</head>
-<body>
-    <h1>Admin Login</h1>
-    <form method="post">
-        <label>Password:</label>
-        <input type="password" name="password" required>
+  </head>
+  <body>
+    <div class="login-container">
+      <h1>Admin Login</h1>
+      <form method="post">
+        <label for="password">Password:</label>
+        <input type="password" name="password" id="password" required />
         <button type="submit">Log in</button>
         {% if error %}
-          <div class="error">{{ error }}</div>
+        <div class="error">{{ error }}</div>
         {% endif %}
-    </form>
-    <p><a href="/">Back to homepage</a></p>
-</body>
+      </form>
+      <a class="back-link" href="/">← Back to homepage</a>
+    </div>
+  </body>
 </html>
