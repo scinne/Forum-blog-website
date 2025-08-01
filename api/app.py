@@ -8,7 +8,7 @@ import re
 import requests
 
 # Replace with your actual environment variable name or set securely in your environment
-API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")  
+API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN")
 ACCOUNT_ID = "7db864b79fb0154d888a0af42a713b38"
 DATABASE_ID = "e27f62ab-2034-4ea6-9499-ec40dacb34a2"
 
@@ -42,13 +42,17 @@ def d1_query(sql, parameters=None):
 
     resp = requests.post(url, json=payload, headers=headers)
     resp.raise_for_status()
-    data = resp.json()
+
+    data = resp.json() 
     if not data.get("success", False):
         raise Exception(f"D1 query failed: {data.get('errors')}")
+
     results = []
+
     for result_block in data.get("result", []):
         results.extend(result_block.get("results", []))
     return results
+
 
 def get_posts():
     sql = "SELECT id, title, content, image_filename, created_at FROM posts ORDER BY created_at DESC"
