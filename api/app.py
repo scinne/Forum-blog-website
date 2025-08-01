@@ -1,13 +1,16 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 from datetime import timedelta
 from werkzeug.utils import secure_filename
-import sqlite3
 import datetime
 import os
 import uuid
 import re
+import requests
 
-
+# Replace with your actual environment variable name or set securely in your environment
+API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")  
+ACCOUNT_ID = "7db864b79fb0154d888a0af42a713b38"
+DATABASE_ID = "e27f62ab-2034-4ea6-9499-ec40dacb34a2"
 
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
@@ -19,35 +22,63 @@ ADMIN_PASSWORD = "Password123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8MB max
 
+# Create upload folder locally only (Vercel is read-only except /tmp)
 if not os.environ.get('VERCEL'):
-
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def d1_query(sql, parameters=None):
+    """Send a SQL query to Cloudflare D1 and return results."""
+    url = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/d1/database/{DATABASE_ID}/query"
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {"sql": sql}
+    if parameters:
+        payload["parameters"] = parameters
+
+    resp = requests.post(url, json=payload, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
+    if not data.get("success", False):
+        raise Exception(f"D1 query failed: {data.get('errors')}")
+    results = []
+    for result_block in data.get("result", []):
+        results.extend(result_block.get("results", []))
+    return results
+
 def get_posts():
-    with sqlite3.connect("posts.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT id, title, content, image_filename, created_at FROM posts ORDER BY created_at DESC")
-        rows = c.fetchall()
-        return [
-            (
-                post_id,
-                title,
-                re.sub(r'^\s+', '', content),
-                image_filename,
-                created_at
-            )
-            for (post_id, title, content, image_filename, created_at) in rows
-        ]
+    sql = "SELECT id, title, content, image_filename, created_at FROM posts ORDER BY created_at DESC"
+    results = d1_query(sql)
+    # Clean leading whitespace in content
+    posts = []
+    for row in results:
+        posts.append((
+            row['id'],
+            row['title'],
+            re.sub(r'^\s+', '', row['content'] or ""),
+            row['image_filename'],
+            row['created_at']
+        ))
+    return posts
 
 def get_post(post_id):
-    with sqlite3.connect("posts.db") as conn:
-        c = conn.cursor()
-        c.execute("SELECT id, title, content, image_filename, created_at FROM posts WHERE id=?", (post_id,))
-        return c.fetchone()
+    sql = "SELECT id, title, content, image_filename, created_at FROM posts WHERE id = ?"
+    params = [post_id]
+    results = d1_query(sql, params)
+    if results:
+        row = results[0]
+        return (
+            row['id'],
+            row['title'],
+            re.sub(r'^\s+', '', row['content'] or ""),
+            row['image_filename'],
+            row['created_at']
+        )
+    return None
 
 @app.route("/")
 def homepage():
@@ -70,25 +101,32 @@ def admin():
             image = request.files.get("image")
             image_filename = None
 
+            # Save upload locally only if allowed and not on Vercel serverless
             if image and allowed_file(image.filename) and image.filename:
                 original_filename = secure_filename(image.filename)
                 ext = os.path.splitext(original_filename)[1]
                 unique_filename = f"{uuid.uuid4().hex}{ext}"
-                image.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-                image_filename = unique_filename
+                save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
 
-            created_at = datetime.datetime.now()
-            with sqlite3.connect("posts.db") as conn:
-                c = conn.cursor()
-                c.execute(
-                    "INSERT INTO posts (title, content, image_filename, created_at) VALUES (?, ?, ?, ?)",
-                    (title, content, image_filename, created_at)
-                )
-                post_id = c.lastrowid
-                conn.commit()
-            return redirect(f"/post/{post_id}")
+                # Only save file locally if not on Vercel because filesystem is read-only
+                if not os.environ.get('VERCEL'):
+                    image.save(save_path)
+                    image_filename = unique_filename
+                else:
+                    # On Vercel, you need an external file storage solution
+                    image_filename = None  # Optionally handle external upload API here
+
+            created_at = datetime.datetime.now().isoformat()
+            sql = (
+                "INSERT INTO posts (title, content, image_filename, created_at) VALUES (?, ?, ?, ?)"
+            )
+            params = [title, content, image_filename, created_at]
+            d1_query(sql, params)
+            # Get last inserted id is not straightforward via API; consider alternative design
+            # Instead redirect to homepage or another page
+            return redirect(url_for("homepage"))
         return render_template("admin.html")
-    
+
     if request.method == "POST":
         password = request.form.get("password")
         if password == ADMIN_PASSWORD:
@@ -101,15 +139,13 @@ def admin():
             return render_template("admin_login.html", error=error)
     return render_template("admin_login.html")
 
-
 @app.route("/delete/<int:post_id>", methods=["POST"])
 def delete_post(post_id):
     if not session.get("admin_authenticated"):
         return redirect(url_for("admin"))
-    with sqlite3.connect("posts.db") as conn:
-        c = conn.cursor()
-        c.execute("DELETE FROM posts WHERE id=?", (post_id,))
-        conn.commit()
+    sql = "DELETE FROM posts WHERE id = ?"
+    params = [post_id]
+    d1_query(sql, params)
     return redirect("/")
 
 @app.route("/logout")
