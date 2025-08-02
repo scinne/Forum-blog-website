@@ -5,32 +5,24 @@ import os
 import uuid
 import re
 import requests
-import boto3
+import base64
 
-# === CONFIGURATION ===
+# Configuration
 API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "cgowbIR5Q_UlDfqhVOVlkv93LpRhUudUiy-ammWf").strip()
 ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
 DATABASE_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "e27f62ab-2034-4ea6-9499-ec40dacb34a2").strip()
 
-# === For Cloudflare R2 (set these if deploying on Vercel/serverless) ===
-R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
-R2_BUCKET = os.environ.get("R2_BUCKET", "")
-R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
-R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "")  # e.g. https://<your-r2-bucket>.<account_id>.r2.cloudflarestorage.com
-
-UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
+if not API_TOKEN or not ACCOUNT_ID or not DATABASE_ID:
+    raise RuntimeError(
+        "Missing Cloudflare D1 configuration environment variables."
+    )
 
 app = Flask(__name__)
 app.permanent_session_lifetime = timedelta(minutes=10)
-app.secret_key = "w4tawetfwazwerferf"
+app.secret_key = "YOUR_SECRET_KEY"  # Replace with a secure secret!
 ADMIN_PASSWORD = "Password123"
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
-
-if not os.environ.get('VERCEL'):
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -45,33 +37,30 @@ def d1_query(sql, parameters=None):
         "Content-Type": "application/json"
     }
     payload = {"sql": sql}
-    if parameters:
+    if parameters is not None:
         payload["parameters"] = parameters
+
+    print(f"SQL: {sql}")
+    print(f"Parameters: {parameters}")
+    print(f"URL: {url}")
+
     resp = requests.post(url, json=payload, headers=headers)
+
+    print(f"Status: {resp.status_code}")
+    print(f"Response: {resp.text}")
+
     resp.raise_for_status()
     data = resp.json()
     if not data.get("success", False):
         raise Exception(f"D1 query failed: {data.get('errors')}")
+
     results = []
     for block in data.get("result", []):
         results.extend(block.get("results", []))
     return results
 
-def upload_to_r2(file_obj, filename):
-    if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ACCOUNT_ID, R2_PUBLIC_URL]):
-        raise RuntimeError("Missing Cloudflare R2 configuration for image upload.")
-    r2 = boto3.client(
-        's3',
-        endpoint_url = f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
-        aws_access_key_id = R2_ACCESS_KEY_ID,
-        aws_secret_access_key = R2_SECRET_ACCESS_KEY,
-        region_name = "auto"
-    )
-    r2.put_object(Bucket=R2_BUCKET, Key=filename, Body=file_obj, ContentType='application/octet-stream', ACL='public-read')
-    return f"{R2_PUBLIC_URL}/{filename}"
-
 def get_posts():
-    sql = "SELECT id, title, content, image_filename, created_at FROM posts ORDER BY created_at DESC"
+    sql = "SELECT id, title, content, image_base64, image_mimetype, created_at FROM posts ORDER BY created_at DESC"
     try:
         results = d1_query(sql)
         posts = []
@@ -80,7 +69,8 @@ def get_posts():
                 row.get('id'),
                 row.get('title'),
                 re.sub(r'^\s+', '', row.get('content') or ""),
-                row.get('image_filename'),
+                row.get('image_base64'),
+                row.get('image_mimetype'),
                 row.get('created_at')
             ))
         return posts
@@ -89,7 +79,7 @@ def get_posts():
         return []
 
 def get_post(post_id):
-    sql = f"SELECT id, title, content, image_filename, created_at FROM posts WHERE id = {int(post_id)}"
+    sql = f"SELECT id, title, content, image_base64, image_mimetype, created_at FROM posts WHERE id = {int(post_id)}"
     try:
         results = d1_query(sql)
         if results:
@@ -98,7 +88,8 @@ def get_post(post_id):
                 row.get('id'),
                 row.get('title'),
                 re.sub(r'^\s+', '', row.get('content') or ""),
-                row.get('image_filename'),
+                row.get('image_base64'),
+                row.get('image_mimetype'),
                 row.get('created_at')
             )
     except Exception as e:
@@ -123,33 +114,25 @@ def admin():
         if request.method == "POST":
             title = request.form.get("title", "").strip()
             content = request.form.get("content", "").strip()
-            image = request.files.get("image")
-            image_filename = ""
-            if image and allowed_file(image.filename) and image.filename:
-                original_filename = secure_filename(image.filename)
-                ext = os.path.splitext(original_filename)[1]
-                unique_filename = f"{uuid.uuid4().hex}{ext}"
-                if not os.environ.get('VERCEL'):
-                    save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                    try:
-                        image.save(save_path)
-                        image_filename = unique_filename
-                    except Exception as e:
-                        print(f"Failed to save uploaded image locally: {e}")
-                else:
-                    try:
-                        image_filename = upload_to_r2(image, unique_filename)
-                    except Exception as e:
-                        print(f"Failed to upload image to Cloudflare R2: {e}")
-                        image_filename = ""
 
-            # Save a full R2 URL or just filename for static/local
+            image = request.files.get("image")
+            image_base64 = None
+            image_mimetype = None
+
+            if image and allowed_file(image.filename) and image.filename:
+                img_data = image.read()
+                image_base64 = base64.b64encode(img_data).decode('utf-8')
+                image_mimetype = image.mimetype  # E.g. 'image/png'
+
+            # Compose SQL with escaped literals; use new columns
             title_esc = escape_sql(title)
             content_esc = escape_sql(content)
-            image_filename_esc = escape_sql(image_filename)
+            image_base64_esc = escape_sql(image_base64) if image_base64 else ""
+            image_mimetype_esc = escape_sql(image_mimetype) if image_mimetype else ""
+
             sql = (
-                "INSERT INTO posts (title, content, image_filename, created_at) VALUES "
-                f"('{title_esc}', '{content_esc}', '{image_filename_esc}', datetime('now'))"
+                "INSERT INTO posts (title, content, image_base64, image_mimetype, created_at) "
+                f"VALUES ('{title_esc}', '{content_esc}', '{image_base64_esc}', '{image_mimetype_esc}', datetime('now'))"
             )
             try:
                 d1_query(sql)
