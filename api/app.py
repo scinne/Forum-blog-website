@@ -8,18 +8,16 @@ import requests
 import base64
 
 # Configuration
-API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "cgowbIR5Q_UlDfqhVOVlkv93LpRhUudUiy-ammWf").strip()
-ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
-DATABASE_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "e27f62ab-2034-4ea6-9499-ec40dacb34a2").strip()
+API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+DATABASE_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "").strip()
 
 if not API_TOKEN or not ACCOUNT_ID or not DATABASE_ID:
-    raise RuntimeError(
-        "Missing Cloudflare D1 configuration environment variables."
-    )
+    raise RuntimeError("Missing Cloudflare D1 configuration variables.")
 
 app = Flask(__name__)
 app.permanent_session_lifetime = timedelta(minutes=10)
-app.secret_key = "YOUR_SECRET_KEY"  # Replace with a secure secret!
+app.secret_key = "YOUR_SECRET_KEY"
 ADMIN_PASSWORD = "Password123"
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
@@ -30,30 +28,21 @@ def allowed_file(filename):
 def escape_sql(s):
     return s.replace("'", "''") if s else ""
 
-def d1_query(sql, parameters=None):
+def d1_query(sql):
     url = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/d1/database/{DATABASE_ID}/query"
     headers = {
         "Authorization": f"Bearer {API_TOKEN}",
         "Content-Type": "application/json"
     }
     payload = {"sql": sql}
-    if parameters is not None:
-        payload["parameters"] = parameters
-
     print(f"SQL: {sql}")
-    print(f"Parameters: {parameters}")
-    print(f"URL: {url}")
-
     resp = requests.post(url, json=payload, headers=headers)
-
     print(f"Status: {resp.status_code}")
     print(f"Response: {resp.text}")
-
     resp.raise_for_status()
     data = resp.json()
     if not data.get("success", False):
         raise Exception(f"D1 query failed: {data.get('errors')}")
-
     results = []
     for block in data.get("result", []):
         results.extend(block.get("results", []))
@@ -114,22 +103,17 @@ def admin():
         if request.method == "POST":
             title = request.form.get("title", "").strip()
             content = request.form.get("content", "").strip()
-
             image = request.files.get("image")
             image_base64 = None
             image_mimetype = None
-
             if image and allowed_file(image.filename) and image.filename:
                 img_data = image.read()
                 image_base64 = base64.b64encode(img_data).decode('utf-8')
-                image_mimetype = image.mimetype  # E.g. 'image/png'
-
-            # Compose SQL with escaped literals; use new columns
+                image_mimetype = image.mimetype
             title_esc = escape_sql(title)
             content_esc = escape_sql(content)
             image_base64_esc = escape_sql(image_base64) if image_base64 else ""
             image_mimetype_esc = escape_sql(image_mimetype) if image_mimetype else ""
-
             sql = (
                 "INSERT INTO posts (title, content, image_base64, image_mimetype, created_at) "
                 f"VALUES ('{title_esc}', '{content_esc}', '{image_base64_esc}', '{image_mimetype_esc}', datetime('now'))"
@@ -141,7 +125,6 @@ def admin():
                 print(f"Failed to insert post: {e}")
                 return render_template("admin.html", error="Failed to add post. Please try again.")
         return render_template("admin.html")
-
     if request.method == "POST":
         password = request.form.get("password", "")
         if password == ADMIN_PASSWORD:
@@ -157,6 +140,7 @@ def admin():
 def delete_post(post_id):
     if not session.get("admin_authenticated"):
         return redirect(url_for("admin"))
+    # Use literal SQL again for D1 API
     sql = f"DELETE FROM posts WHERE id = {int(post_id)}"
     try:
         d1_query(sql)
