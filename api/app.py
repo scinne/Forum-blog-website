@@ -19,7 +19,7 @@ R2_BUCKET = os.environ.get("R2_BUCKET", "new").strip()
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
 R2_PUBLIC_URL = os.environ.get(
     "R2_PUBLIC_URL",
-    f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{R2_BUCKET}"
+    f"https://pub-02591fc357d949c7bdd7fd8b20ae16ad.r2.dev"
 ).strip()
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
