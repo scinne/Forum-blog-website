@@ -17,7 +17,10 @@ R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "6c1eb100a01a6012280dec3f8
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "ee2d52697919abd8abe2e9dd80980b3d1b6dd86f3f7a302bfceec52ae9993908").strip()
 R2_BUCKET = os.environ.get("R2_BUCKET", "new").strip()
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
-R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{R2_BUCKET}").strip()
+R2_PUBLIC_URL = os.environ.get(
+    "R2_PUBLIC_URL",
+    f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{R2_BUCKET}"
+).strip()
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
@@ -29,7 +32,7 @@ ADMIN_PASSWORD = "Password123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8 MB
 
-# Create upload folder locally if not on Vercel
+# Create local uploads folder if running locally
 if not os.environ.get('VERCEL'):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -59,24 +62,24 @@ def d1_query(sql, parameters=None):
     return results
 
 def upload_to_r2(file_obj, filename, content_type="application/octet-stream"):
+    # Ensure all required parameters present
     if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ACCOUNT_ID, R2_PUBLIC_URL]):
         raise RuntimeError("Missing Cloudflare R2 configuration for image upload.")
     r2 = boto3.client(
         's3',
-        endpoint_url = f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
-        aws_access_key_id = R2_ACCESS_KEY_ID,
-        aws_secret_access_key = R2_SECRET_ACCESS_KEY,
-        region_name = "auto"
+        endpoint_url=f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto"
     )
-    # Ensure file_obj is at start
     if hasattr(file_obj, "seek"):
         file_obj.seek(0)
     r2.put_object(
-        Bucket = R2_BUCKET,
-        Key = filename,
-        Body = file_obj.read() if hasattr(file_obj, "read") else file_obj,
-        ContentType = content_type,
-        ACL = 'public-read'
+        Bucket=R2_BUCKET,
+        Key=filename,
+        Body=file_obj.read() if hasattr(file_obj, "read") else file_obj,
+        ContentType=content_type,
+        ACL='public-read'
     )
     return f"{R2_PUBLIC_URL}/{filename}"
 
@@ -139,19 +142,22 @@ def admin():
                 original_filename = secure_filename(image.filename)
                 ext = os.path.splitext(original_filename)[1]
                 unique_filename = f"{uuid.uuid4().hex}{ext}"
-                if not os.environ.get('VERCEL'):
+
+                if os.environ.get('VERCEL'):
+                    # On Vercel: always upload to R2!
+                    try:
+                        image_filename = upload_to_r2(image.stream, unique_filename, content_type=image.mimetype)
+                    except Exception as e:
+                        print(f"Failed to upload image to Cloudflare R2: {e}")
+                        image_filename = ""
+                else:
+                    # On local: save file to static/uploads
                     save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                     try:
                         image.save(save_path)
                         image_filename = unique_filename
                     except Exception as e:
                         print(f"Failed to save uploaded image locally: {e}")
-                        image_filename = ""
-                else:
-                    try:
-                        image_filename = upload_to_r2(image.stream, unique_filename, content_type=image.mimetype)
-                    except Exception as e:
-                        print(f"Failed to upload image to Cloudflare R2: {e}")
                         image_filename = ""
 
             title_esc = escape_sql(title)
