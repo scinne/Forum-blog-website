@@ -224,13 +224,18 @@
         <h2><a href="/post/{{ post[0] }}">{{ post[1] }}</a></h2>
         <time>{{ post[4] }}</time>
         <div class="post-preview" style="white-space: pre-wrap">{{ post[2][:200] }}{% if post[2]|length > 200 %}...{% endif %}</div>
-        {% if post[3] %} {% if post[3].lower().endswith(('.png', '.jpg',
-        '.jpeg', '.gif', '.bmp', '.webp')) %}
+        {% if post[3] %} {% if post[3].lower().startswith('http') %} {% if
+        post[3].lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp',
+        '.webp')) %}
+        <img src="{{ post[3] }}" alt="Uploaded image" />
+        {% endif %} {% elif post[3].lower().endswith(('.png', '.jpg', '.jpeg',
+        '.gif', '.bmp', '.webp')) %}
         <img
           src="{{ url_for('static', filename='uploads/' ~ post[3]) }}"
           alt="Uploaded image"
         />
         {% endif %} {% endif %}
+
         <div class="button-row">
           <a class="read-more" href="/post/{{ post[0] }}">Read more</a>
           {% if session.get('admin_authenticated') %}
@@ -256,6 +261,7 @@
 
       <a class="admin-link" href="/admin">Add New Post</a>
     </div>
+
     {% if session.get('admin_authenticated') %}
     <a href="/logout" class="logout-btn">Log out</a>
     {% endif %}

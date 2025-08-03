@@ -136,8 +136,26 @@
     <div class="container">
       <h1>{{ post[1] }}</h1>
       <time>{{ post[4] }}</time>
-      {% if post[3] %} {% if post[3].lower().endswith(('.png', '.jpg', '.jpeg',
-      '.gif', '.bmp', '.webp')) %}
+      {% if post[3] %} {% if post[3].lower().startswith('http') %} {% if
+      post[3].lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp',
+      '.webp')) %}
+      <img src="{{ post[3] }}" alt="Uploaded image" />
+      {% elif post[3].lower().endswith('.pdf') %}
+      <a
+        href="{{ post[3] }}"
+        target="_blank"
+        style="color: #fff; margin: 1.5em 0 0.5em 0; text-decoration: underline"
+        >View PDF Attachment</a
+      >
+      {% elif post[3].lower().endswith('.txt') %}
+      <a
+        href="{{ post[3] }}"
+        target="_blank"
+        style="color: #fff; margin: 1.5em 0 0.5em 0; text-decoration: underline"
+        >Download Text File</a
+      >
+      {% endif %} {% else %} {% if post[3].lower().endswith(('.png', '.jpg',
+      '.jpeg', '.gif', '.bmp', '.webp')) %}
       <img
         src="{{ url_for('static', filename='uploads/' ~ post[3]) }}"
         alt="Uploaded image"
@@ -146,27 +164,17 @@
       <a
         href="{{ url_for('static', filename='uploads/' ~ post[3]) }}"
         target="_blank"
-        style="
-          color: #fff;
-          display: block;
-          margin: 1.5em 0 0.5em 0;
-          text-decoration: underline;
-        "
+        style="color: #fff; margin: 1.5em 0 0.5em 0; text-decoration: underline"
         >View PDF Attachment</a
       >
       {% elif post[3].lower().endswith('.txt') %}
       <a
         href="{{ url_for('static', filename='uploads/' ~ post[3]) }}"
         target="_blank"
-        style="
-          color: #fff;
-          display: block;
-          margin: 1.5em 0 0.5em 0;
-          text-decoration: underline;
-        "
+        style="color: #fff; margin: 1.5em 0 0.5em 0; text-decoration: underline"
         >Download Text File</a
       >
-      {% endif %} {% endif %}
+      {% endif %} {% endif %} {% endif %}
       <div class="post-content" style="white-space: pre-wrap">{{ post[2] }}</div>
       <div class="button-row">
         {% if session.get('admin_authenticated') %}

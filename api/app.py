@@ -12,14 +12,14 @@ API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "cgowbIR5Q_UlDfqhVOVlkv93LpRh
 ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
 DATABASE_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "e27f62ab-2034-4ea6-9499-ec40dacb34a2").strip()
 
-# === For Cloudflare R2 (set these if deploying on Vercel/serverless) ===
-R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
-R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
-R2_BUCKET = os.environ.get("R2_BUCKET", "")
-R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
-R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "")  # e.g. https://<your-r2-bucket>.<account_id>.r2.cloudflarestorage.com
+# === Cloudflare R2 config ===
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "6c1eb100a01a6012280dec3f8f31916a").strip()
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "ee2d52697919abd8abe2e9dd80980b3d1b6dd86f3f7a302bfceec52ae9993908").strip()
+R2_BUCKET = os.environ.get("R2_BUCKET", "new").strip()
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "7db864b79fb0154d888a0af42a713b38").strip()
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{R2_BUCKET}").strip()
 
-UPLOAD_FOLDER = 'static/uploads'
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf', 'txt'}
 
 app = Flask(__name__)
@@ -27,8 +27,9 @@ app.permanent_session_lifetime = timedelta(minutes=10)
 app.secret_key = "w4tawetfwazwerferf"
 ADMIN_PASSWORD = "Password123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  # 8 MB
 
+# Create upload folder locally if not on Vercel
 if not os.environ.get('VERCEL'):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -57,7 +58,7 @@ def d1_query(sql, parameters=None):
         results.extend(block.get("results", []))
     return results
 
-def upload_to_r2(file_obj, filename):
+def upload_to_r2(file_obj, filename, content_type="application/octet-stream"):
     if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ACCOUNT_ID, R2_PUBLIC_URL]):
         raise RuntimeError("Missing Cloudflare R2 configuration for image upload.")
     r2 = boto3.client(
@@ -67,7 +68,16 @@ def upload_to_r2(file_obj, filename):
         aws_secret_access_key = R2_SECRET_ACCESS_KEY,
         region_name = "auto"
     )
-    r2.put_object(Bucket=R2_BUCKET, Key=filename, Body=file_obj, ContentType='application/octet-stream', ACL='public-read')
+    # Ensure file_obj is at start
+    if hasattr(file_obj, "seek"):
+        file_obj.seek(0)
+    r2.put_object(
+        Bucket = R2_BUCKET,
+        Key = filename,
+        Body = file_obj.read() if hasattr(file_obj, "read") else file_obj,
+        ContentType = content_type,
+        ACL = 'public-read'
+    )
     return f"{R2_PUBLIC_URL}/{filename}"
 
 def get_posts():
@@ -136,14 +146,14 @@ def admin():
                         image_filename = unique_filename
                     except Exception as e:
                         print(f"Failed to save uploaded image locally: {e}")
+                        image_filename = ""
                 else:
                     try:
-                        image_filename = upload_to_r2(image, unique_filename)
+                        image_filename = upload_to_r2(image.stream, unique_filename, content_type=image.mimetype)
                     except Exception as e:
                         print(f"Failed to upload image to Cloudflare R2: {e}")
                         image_filename = ""
 
-            # Save a full R2 URL or just filename for static/local
             title_esc = escape_sql(title)
             content_esc = escape_sql(content)
             image_filename_esc = escape_sql(image_filename)
